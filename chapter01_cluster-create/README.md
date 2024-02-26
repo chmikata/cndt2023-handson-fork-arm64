@@ -1,145 +1,168 @@
-<!-- markdownlint-configure-file {
-  "MD013": {
-    "code_blocks": false,
-    "tables": false
-  },
-  "MD033": false,
-  "MD041": false
-} -->
+# Kubernetesクラスターの作成
 
-<div align="center" markdown="1">
+## はじめに
 
-# Helmfile
+この章では、以降の章で使用するKubernetesクラスターを作成します。
 
-[![Tests](https://github.com/helmfile/helmfile/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/helmfile/helmfile/actions/workflows/ci.yaml?query=branch%3Amain)
-[![Container Image Repository on GHCR](https://ghcr-badge.deta.dev/helmfile/helmfile/latest_tag?trim=major&label=latest "Docker Repository on ghcr")](https://github.com/helmfile/helmfile/pkgs/container/helmfile)
-[![Go Report Card](https://goreportcard.com/badge/github.com/helmfile/helmfile)](https://goreportcard.com/report/github.com/helmfile/helmfile)
-[![Slack Community #helmfile](https://slack.sweetops.com/badge.svg)](https://slack.sweetops.com)
-[![Documentation](https://readthedocs.org/projects/helmfile/badge/?version=latest&style=flat)](https://helmfile.readthedocs.io/en/latest/)
+Kubernetesクラスターを作成する方法はいくつかありますが、今回のハンズオンではkindを利用してKubernetesクラスターを作成します。
+構成としてはControl Plane 1台とWorker Node 2台の構成で作成します。
 
-Deploy Kubernetes Helm Charts
-<br />
+![](image/ch1-1.png)
 
-</div>
+はじめに、Kubernetesクラスターの構築に必要な下記ツールをインストールします。
 
-English | [简体中文](./README-zh_CN.md)
+- [kind](https://kind.sigs.k8s.io/)
+- [kubectl](https://kubernetes.io/ja/docs/reference/kubectl/)
+- [Helm](https://helm.sh/ja/)
+- [Helmfile](https://helmfile.readthedocs.io/en/latest/)
 
-## About
+kindはDockerを使用してローカル環境にKubernetesクラスターを構築するためのツールになります。
+また、kubectlはKubernetes APIを使用してKubernetesクラスターのコントロールプレーンと通信をするためのコマンドラインツールです。
+HelmはKubernetes用のパッケージマネージャーであり、Helmfileを使用することで複数のHelmチャートを宣言的に管理できます。
+各ツールの詳細については上記リンクをご参照ください。
 
-Helmfile is a declarative spec for deploying helm charts. It lets you...
+上記のツールは`install-tools.sh`を実行することでインストールされます。
 
-* Keep a directory of chart value files and maintain changes in version control.
-* Apply CI/CD to configuration changes.
-* Periodically sync to avoid skew in environments.
-
-To avoid upgrades for each iteration of `helm`, the `helmfile` executable delegates to `helm` - as a result, `helm` must be installed.
-
-## Highlights
-
-**Declarative**: Write, version-control, apply the desired state file for visibility and reproducibility.
-
-**Modules**: Modularize common patterns of your infrastructure, distribute it via Git, S3, etc. to be reused across the entire company (See [#648](https://github.com/roboll/helmfile/pull/648))
-
-**Versatility**: Manage your cluster consisting of charts, [kustomizations](https://github.com/kubernetes-sigs/kustomize), and directories of Kubernetes resources, turning everything to Helm releases (See [#673](https://github.com/roboll/helmfile/pull/673))
-
-**Patch**: JSON/Strategic-Merge Patch Kubernetes resources before `helm-install`ing, without forking upstream charts (See [#673](https://github.com/roboll/helmfile/pull/673))
-
-## Status
-
-March 2022 Update - The helmfile project has been moved to [helmfile/helmfile](https://github.com/helmfile/helmfile) from the former home `roboll/helmfile`. Please see roboll/helmfile#1824 for more information.
-
-Even though Helmfile is used in production environments [across multiple organizations](USERS.md), it is still in its early stage of development, hence versioned 0.x.
-
-Helmfile complies to Semantic Versioning 2.0.0 in which v0.x means that there could be backward-incompatible changes for every release.
-
-Note that we will try our best to document any backward incompatibility. And in reality, helmfile had no breaking change for a year or so.
-
-
-## Installation
-
-**1: Binary Installation**
-
-download one of [releases](https://github.com/helmfile/helmfile/releases)
-
-**2: Package Manager**
-
-* Archlinux: install via `pacman -S helmfile`
-* openSUSE: install via `zypper in helmfile` assuming you are on Tumbleweed; if you are on Leap you must add the [kubic](https://download.opensuse.org/repositories/devel:/kubic/) repo for your distribution version once before that command, e.g. `zypper ar https://download.opensuse.org/repositories/devel:/kubic/openSUSE_Leap_\$releasever kubic`
-* Windows (using [scoop](https://scoop.sh/)): `scoop install helmfile`
-* macOS (using [homebrew](https://brew.sh/)): `brew install helmfile`
-
-**3: Container**
-
-For more details, see [run as a container](https://helmfile.readthedocs.io/en/latest/#running-as-a-container)
-
-> Make sure to run `helmfile init` once after installation. Helmfile uses the [helm-diff](https://github.com/databus23/helm-diff) plugin.
-
-## Getting Started
-
-Let's start with a simple `helmfile` and gradually improve it to fit your use-case!
-
-Suppose the `helmfile.yaml` representing the desired state of your helm releases looks like:
-
-```yaml
-repositories:
-- name: prometheus-community
-  url: https://prometheus-community.github.io/helm-charts
-
-releases:
-- name: prom-norbac-ubuntu
-  namespace: prometheus
-  chart: prometheus-community/prometheus
-  set:
-  - name: rbac.create
-    value: false
+```shell
+./install-tools.sh
 ```
 
-Sync your Kubernetes cluster state to the desired one by running:
+インストールスクリプトの中で、ログインユーザを docker グループに所属させる設定を入れています。
+一旦ログアウトしてログインし直してください。
 
-```console
-helmfile apply
+> [!WARNING]
+>
+> [Known Issue#Pod errors due to "too many open files"](https://kind.sigs.k8s.io/docs/user/known-issues/#pod-errors-due-to-too-many-open-files)に記載があるように、kindではホストのinotifyリソースが不足しているとエラーが発生します。
+> ハンズオン環境ではinotifyリソースが不足しているため、sysctlを利用してカーネルパラメータを修正する必要があります。
+> ```shell
+> sudo sysctl fs.inotify.max_user_watches=524288
+> sudo sysctl fs.inotify.max_user_instances=512
+> ```
+>
+> また、設定の永続化を行うためには、下記のコマンドを実行する必要があります。
+> ```shell
+> cat << EOF | sudo tee /etc/sysctl.conf >/dev/null
+> fs.inotify.max_user_watches = 524288
+> fs.inotify.max_user_instances = 512
+> EOF
+> ```
+
+構築するKubernetesクラスターの設定は`kind-config.yaml`で行います。
+今回は下記のような設定でKubernetesクラスターを構築します。
+- ホスト上のポートを下記のようにkind上のControl Planeのポートにマッピング
+  -    80 -> 30080
+  -   443 -> 30443
+
+configオプションで`kind-config.yaml`を指定してKubernetesクラスターを作成します。
+
+```shell
+sudo kind create cluster --config=kind-config.yaml
 ```
 
-Congratulations! You now have your first Prometheus deployment running inside
- your cluster.
+コマンドを実行すると以下のような情報が出力されます。
 
-Iterate on the `helmfile.yaml` by referencing:
+```shell
+Creating cluster "kind" ...
+ ✓ Ensuring node image (kindest/node:v1.27.3) 🖼 
+ ✓ Preparing nodes 📦 📦 📦  
+ ✓ Writing configuration 📜 
+ ✓ Starting control-plane 🕹️ 
+ ✓ Installing CNI 🔌 
+ ✓ Installing StorageClass 💾 
+ ✓ Joining worker nodes 🚜 
+Set kubectl context to "kind-test"
+You can now use your cluster with:
 
-* [Configuration](https://helmfile.readthedocs.io/en/latest/#configuration)
-* [CLI reference](https://helmfile.readthedocs.io/en/latest/#cli-reference)
-* [Helmfile Best Practices Guide](https://helmfile.readthedocs.io/en/latest/writing-helmfile/)
+kubectl cluster-info --context kind-kind
 
-## Docs
+Not sure what to do next? 😅  Check out https://kind.sigs.k8s.io/docs/user/quick-start/
+```
 
-Please read [complete documentation](https://helmfile.readthedocs.io/)
+> [!NOTE]
+> 
+> kubectlコマンドの実行時には、Kubernetesクラスターに接続するための認証情報などが必要になります。
+> それらの情報は、kindでクラスターを作成した際に保存され、デフォルトで`~/.kube/config`に格納されます。
+> このファイルに格納される情報は、kindコマンドを利用しても取得することが可能です
+>
+> ```shell
+> sudo kind get kubeconfig
+>
+> # ubuntu ユーザー（一般ユーザー）で実行する場合
+> mkdir ~/.kube
+> sudo kind get kubeconfig > ~/.kube/config
+> chmod 600 ~/.kube/config
+> ```
 
-## Contributing
+最後に、下記のコンポーネントをデプロイします。
 
-Welcome to contribute together to make helmfile better: [contributing doc](https://helmfile.readthedocs.io/en/latest/contributing/)
+- [Ingress NGINX Controller](https://github.com/kubernetes/ingress-nginx)
 
-## Attribution
+Ingress NGINX Controllerはインターネットからkind上のServiceリソースへ通信をルーティングするためにインストールします。
+各コンポーネントの詳細については上記リンクをご参照ください。
 
-We use:
+```shell
+helmfile sync -f helm/helmfile.yaml
+```
 
-* [semtag](https://github.com/pnikosis/semtag) for automated semver tagging.
-I greatly appreciate the author(pnikosis)'s effort on creating it and their
-kindness to share it!
+## kubectlコマンドのシェル補完の有効化
 
-## Users
+tabキーで補完が効くように、kubectlコマンドのシェル補完を有効化します。
 
-Helmfile has been used by many users in production:
+```sh
+source <(kubectl completion bash)
+```
 
-* [gitlab.com](https://gitlab.com)
-* [reddit.com](https://reddit.com)
-* [Jenkins](https://jenkins.io)
-* ...
+次回以降もbash起動時にシェル補完を有効化する場合は下記のコマンドも実行しておきます。
 
-For more users, please see: [Users](https://helmfile.readthedocs.io/en/latest/users/)
+```sh
+echo 'source <(kubectl completion bash)' >>~/.bashrc
+```
 
-## License
+## Kubernetesクラスターへの接続確認
 
-[MIT](https://github.com/helmfile/helmfile/blob/main/LICENSE)
+まずはKubernetesクラスターの情報が取得できることを確認します。
 
-## Star History
+```shell
+kubectl cluster-info
+```
 
-[![Star History Chart](https://api.star-history.com/svg?repos=helmfile/helmfile&type=Date)](https://star-history.com/#helmfile/helmfile&Date)
+下記のような情報が出力されれば大丈夫です。
+
+```shell
+Kubernetes control plane is running at https://127.0.0.1:44707
+CoreDNS is running at https://127.0.0.1:44707/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+```
+
+## アプリケーションのデプロイ
+次章以降で使用する動作確認用アプリケーションとして、[Argo Rollouts Demo Application](https://github.com/argoproj/rollouts-demo)をデプロイします。
+
+```shell
+kubectl create namespace handson
+kubectl apply -f manifest/app/serviceaccount.yaml -n handson -l color=blue
+kubectl apply -f manifest/app/deployment.yaml -n handson -l color=blue
+kubectl apply -f manifest/app/service.yaml -n handson
+kubectl apply -f manifest/app/ingress.yaml -n handson
+```
+
+作成されるリソースは下記のとおりです。
+
+```shell
+kubectl get services,deployments,ingresses -n handson
+```
+```shell
+# 実行結果
+NAME              TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+service/handson   ClusterIP   10.96.82.202   <none>        8080/TCP   3m33s
+
+NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/handson-blue   1/1     1            1           3m34s
+
+NAME                                             CLASS   HOSTS             ADDRESS       PORTS   AGE
+ingress.networking.k8s.io/app-ingress-by-nginx   nginx   app.example.com   10.96.54.28   80      3m9s
+```
+
+ブラウザから`http://app.example.com`に接続し、下記のような画面が表示されることを確認してください。
+
+![](./image/app-simple-routing.png)
