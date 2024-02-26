@@ -150,7 +150,7 @@ Canary Releaseは、新旧混在状態を制御し、本番環境において限
 
  `app/blue-green/rollout.yaml`の編集を行います。 imageのtagをblueからgreenに変更します。
 ```
-image: argoproj/rollouts-demo:green
+image: chmikata/rollouts-demo:green
 ```
 差分をforkしたmainブランチ（appを作成する際に指定したブランチ）に取り込みます。
 ```
@@ -228,7 +228,7 @@ Applications画面の場合は、一番右下の端に、
 
  `app/canary/rollout.yaml`の編集を行います。imageのtagをblueからgreenに変更します。
 ```
-image: argoproj/rollouts-demo:green
+image: chmikata/rollouts-demo:green
 ```
 差分をforkしたmainブランチ（appを作成する際に指定したブランチ）に取り込みます。
 ```
@@ -315,7 +315,7 @@ Applicationsの画面において + NEW APPをクリックします
 analysis/job/rollout.yamlの編集を行います。 imageのtagをblueからgreenに変更します。
 
 ```yaml
-image: argoproj/rollouts-demo:green
+image: chmikata/rollouts-demo:green
 ```
 差分をforkしたmainブランチ（appを作成する際に指定したブランチ）に取り込みます。
 ```
@@ -376,7 +376,7 @@ Applicationsの画面において + NEW APPをクリックします
 analysis/web/rollout.yamlの編集を行います。 imageのtagをblueからgreenに変更します。
 
 ```yaml
-image: argoproj/rollouts-demo:green
+image: chmikata/rollouts-demo:green
 ```
 差分をforkしたmainブランチ（appを作成する際に指定したブランチ）に取り込みます。
 ```
@@ -435,7 +435,7 @@ Applicationsの画面において + NEW APPをクリックします
 analysis/prometheus/rollout.yamlの編集を行います。 imageのtagをblueからgreenに変更します。
 
 ```yaml
-image: argoproj/rollouts-demo:green
+image: chmikata/rollouts-demo:green
 ```
 差分をforkしたmainブランチ（appを作成する際に指定したブランチ）に取り込みます。
 ```

@@ -9,7 +9,7 @@ spec:
   template:
     spec:
       containers:
-      - image: argoproj/rollouts-demo:green
+      - image: chmikata/rollouts-demo:green
         imagePullPolicy: IfNotPresent
         name: handson
   

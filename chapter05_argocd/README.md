@@ -161,7 +161,7 @@ http://app.argocd.example.com
 
 app/default/deployment.yamlの編集を行います。 imageのtagをblueからgreenに変更します。
 ```
-image: argoproj/rollouts-demo:green
+image: chmikata/rollouts-demo:green
 ```
 差分をforkしたmainブランチ（Argo CDのappを作成する際に指定したブランチ）に取り込みます。
 ```
