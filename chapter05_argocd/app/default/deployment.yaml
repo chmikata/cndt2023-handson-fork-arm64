@@ -21,7 +21,7 @@ spec:
         app: handson
     spec:
       containers:
-      - image: chmikata/rollouts-demo:blue
+      - image: chmikata/rollouts-demo:green
         imagePullPolicy: IfNotPresent
         name: handson
         ports:
