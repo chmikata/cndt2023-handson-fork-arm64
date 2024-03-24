@@ -3,7 +3,7 @@ kind: OpenTelemetryCollector
 metadata:
   name: trace-collector
 spec:
-  mode: "deployment"
+  mode: "daemonset"
   config: |
     receivers:
       otlp:
@@ -15,7 +15,7 @@ spec:
     exporters:
       debug: {}
       otlp:
-        endpoint: jaeger-collector.jaeger:43417
+        endpoint: jaeger-collector.jaeger:4317
         tls:
           insecure: true
 

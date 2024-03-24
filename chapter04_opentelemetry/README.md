@@ -463,7 +463,7 @@ Jaegerは以前までは`jaeger`プロトコルを利用していましたが、
 
 
 ログの時と同様に、OpenTelemetryCollectorリソースを利用してKubernetesにデプロイします。
-今回はトレースデータの取得先ホスト上のメトリクスを取得するエージェントとして動作させる想定なため、`.spec.mode`にはdeploymentを指定し、Deploymentとして起動します。
+今回はトレースデータの取得先ホスト上のメトリクスを取得するエージェントとして動作させる想定なため、`.spec.mode`にはdaemonsetを指定し、DaemonSetとして起動します。
 最後に、OpenTelemetry Collectorの設定を`.spec.config`に行っておきます。
 
 ```yaml
@@ -472,7 +472,7 @@ kind: OpenTelemetryCollector
 metadata:
   name: trace-collector
 spec:
-  mode: "deployment"
+  mode: "daemonset"
   config: |
     receivers:
       otlp:
@@ -496,7 +496,7 @@ spec:
           exporters: [debug, otlp]
 ```
 
-OpenTelemetryCollectorリソースをデプロイすると、自動的にDeploymentとPodが起動していることがわかります。
+OpenTelemetryCollectorリソースをデプロイすると、自動的にDaemonSetとPodが起動していることがわかります。
 また、OTLPを受け付ける口として、Serviceも作成されています。
 
 ```sh
@@ -504,7 +504,7 @@ kubectl apply -f manifests/trace-collector.yaml
 ```
 ```sh
 # 実行結果
-opentelemetrycollector/metrics-collector created
+opentelemetrycollector/trace-collector created
 ```
 
 ```sh
@@ -512,23 +512,24 @@ kubectl get opentelemetrycollector trace-collector
 ```
 ```sh
 # 実行結果
-NAME              MODE         VERSION   READY   AGE   IMAGE                                         MANAGEMENT
-trace-collector   deployment   0.87.0    1/1     10m   otel/opentelemetry-collector-contrib:0.87.0   managed
+NAME              MODE         VERSION   READY   AGE   IMAGE   MANAGEMENT
+trace-collector   daemonset    0.87.0            10m           managed
 ```
 ```sh
 kubectl get deployments,pods,services -l app.kubernetes.io/name=trace-collector-collector
 ```
 ```sh
 # 実行結果
-NAME                                        READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/trace-collector-collector   1/1     1            1           10m
+NAME                                       DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemonset.apps/trace-collector-collector   2         2         2       2            2           <none>          28m
 
-NAME                                             READY   STATUS    RESTARTS   AGE
-pod/trace-collector-collector-5bbc5d7c47-jtscf   2/2     Running   0          88s
+NAME                                  READY   STATUS    RESTARTS   AGE
+pod/trace-collector-collector-csr9k   1/1     Running   0          10m
+pod/trace-collector-collector-rvx7w   1/1     Running   0          10m
 
-NAME                                         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
-service/trace-collector-collector            ClusterIP   10.96.172.252   <none>        4317/TCP   10m
-service/trace-collector-collector-headless   ClusterIP   None            <none>        4317/TCP   10m
+NAME                                         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+service/trace-collector-collector            ClusterIP   10.96.157.88   <none>        4317/TCP   28m
+service/trace-collector-collector-headless   ClusterIP   None           <none>        4317/TCP   28m
 ```
 
 
