@@ -516,7 +516,7 @@ NAME              MODE         VERSION   READY   AGE   IMAGE   MANAGEMENT
 trace-collector   daemonset    0.87.0            10m           managed
 ```
 ```sh
-kubectl get deployments,pods,services -l app.kubernetes.io/name=trace-collector-collector
+kubectl get daemonset,pods,services -l app.kubernetes.io/name=trace-collector-collector
 ```
 ```sh
 # 実行結果
@@ -600,7 +600,7 @@ sample-app-blue-5fb8dc75fd-7cvxg   2/2     Ready    0          30s
 
 次に、実際にJaeger上からメトリクスを確認してみましょう。
 まず、`http://app.example.com/` に接続し、一定量のトレースデータを出力します。
-`https://jaeger.example.com/explore` に接続し、Service名に`sample-app-blue`を指定してみると、トレースデータが確認できます。
+`http://jaeger.example.com/explore` に接続し、Service名に`sample-app-blue`を指定してみると、トレースデータが確認できます。
 今回は複雑なマイクロサービスではないため、シンプルな表示になっていますが、サービス間の通信がある場合はもう少し複雑なトレースデータを確認することができます。
 
 ![](./image/jaeger.png)
@@ -635,3 +635,94 @@ Prosessorではメモリ制限・サンプリング・バッチ処理などを�
 [推奨されるProcessor](https://github.com/open-telemetry/opentelemetry-collector/tree/main/processor#recommended-processors)については、Docsを確認してください。
 
 
+## Traceのおまけ編(Java実装)
+
+以下の手順でJava向けに`Instrumentation`リソースの設定を行います。
+テレメトリーの経路はGoの場合と同様です。
+
+```yaml
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: java-instrumentation
+  namespace: handson
+spec:
+  exporter:
+    endpoint: http://trace-collector-collector.default:4317
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "1"
+```
+
+```shell
+kubectl apply -f manifests/java-instrumentation.yaml
+```
+
+サンプルのJavaアプリをデプロイします。
+今回はDeploymentにアノテーションが付いているいるのでpatchは不要です。
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: handson
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+      annotations:
+        instrumentation.opentelemetry.io/inject-java: "java-instrumentation"
+    spec: {...}
+```
+
+```shell
+kubectl apply -f manifests/deployment.yaml
+```
+
+作成されたPodを確認すると、`bff-xxx`と`backend-xxx`が立ち上がっています。
+
+```bash
+kubectl -n handson get pods
+```
+```bash
+# 実行結果
+NAME                            READY   STATUS    RESTARTS   AGE
+backend-85cd7fc5c7-dlfjx        1/1     Running   0          46m
+bff-fcd8c68dc-qf2cj             1/1     Running   0          29m
+```
+
+サンプルのアプリに対応した`Service`, `Ingress`をデプロイします。
+
+```shell
+kubectl apply -f manifests/service.yaml
+kubectl apply -f manifests/ingress.yaml
+```
+
+```bash
+kubectl -n handson get svc,ingress
+```
+
+```bash
+# 実行結果
+NAME              TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)    AGE
+service/backend   ClusterIP   10.96.144.18   <none>        8080/TCP   3h54m
+service/bff       ClusterIP   10.96.152.92   <none>        8080/TCP   3h54m
+service/handson   ClusterIP   10.96.31.46    <none>        8080/TCP   29d
+
+NAME                                              CLASS   HOSTS             ADDRESS         PORTS   AGE
+ingress.networking.k8s.io/app-ingress-by-nginx    nginx   app.example.com   10.96.225.194   80      163m
+ingress.networking.k8s.io/java-ingress-by-nginx   nginx   app.example.com   10.96.225.194   80      3h54m
+```
+
+次に、実際にJaeger上からメトリクスを確認してみましょう。
+まず、`http://app.example.com/bff` に接続し、一定量のトレースデータを出力します。
+`http://jaeger.example.com/explore` に接続し、Service名に`bff`を指定してみると、トレースデータが確認できます。
